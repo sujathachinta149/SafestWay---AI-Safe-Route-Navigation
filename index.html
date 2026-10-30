@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafestWay | AI Pedestrian Safe Navigation</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        #map {
+            height: 500px;
+            border-radius: 12px;
+        }
+
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+<header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-500 p-2 rounded-lg text-slate-950 font-bold">
+                <i class="fa-solid fa-shield-halved text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide">SafestWay</h1>
+                <p class="text-xs text-slate-400">AI-Powered Safe Pedestrian Navigation</p>
+            </div>
+        </div>
+
+        <button onclick="triggerSOS()"
+            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            Emergency SOS
+        </button>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <div class="space-y-6">
+
+        <div class="glass-panel p-5 rounded-xl space-y-4">
+            <h2 class="text-lg font-semibold text-emerald-400">
+                <i class="fa-solid fa-location-dot"></i>
+                Journey Planner
+            </h2>
+
+            <div>
+                <label class="text-xs text-slate-400">Origin Point</label>
+                <input type="text" value="Charing Cross Station, London"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm mt-1">
+            </div>
+
+            <div>
+                <label class="text-xs text-slate-400">Destination Point</label>
+                <input type="text" value="Covent Garden, London"
+                    class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm mt-1">
+            </div>
+
+            <div>
+                <label class="text-xs text-slate-400 flex justify-between">
+                    <span>Min. Lighting Preference</span>
+                    <span id="lightingVal" class="text-emerald-400 font-bold">85%</span>
+                </label>
+
+                <input type="range" min="50" max="100" value="85"
+                    oninput="document.getElementById('lightingVal').innerText=this.value+'%'"
+                    class="w-full accent-emerald-500 mt-1">
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-xl space-y-3">
+            <h2 class="text-lg font-semibold text-emerald-400">🛣️ Select Route</h2>
+
+            <div onclick="selectRoute('safest')" id="card-safest"
+                class="p-3 rounded-lg border-2 border-emerald-500 bg-slate-800/80 cursor-pointer">
+                <div class="flex justify-between">
+                    <span class="font-bold text-emerald-400">Safest AI Route</span>
+                    <span class="text-emerald-400 text-xs font-bold">Score 96/100</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">12 mins • 0.9 km • 96% Lighting</p>
+            </div>
+
+            <div onclick="selectRoute('balanced')" id="card-balanced"
+                class="p-3 rounded-lg border border-slate-700 bg-slate-800/40 cursor-pointer">
+                <div class="flex justify-between">
+                    <span class="font-bold text-blue-400">Balanced Route</span>
+                    <span class="text-blue-400 text-xs font-bold">Score 81/100</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">9 mins • 0.7 km • 78% Lighting</p>
+            </div>
+
+            <div onclick="selectRoute('fastest')" id="card-fastest"
+                class="p-3 rounded-lg border border-slate-700 bg-slate-800/40 cursor-pointer">
+                <div class="flex justify-between">
+                    <span class="font-bold text-rose-400">Fastest Direct Route</span>
+                    <span class="text-rose-400 text-xs font-bold">Score 52/100</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">7 mins • 0.5 km • 38% Lighting</p>
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-xl space-y-3">
+            <h2 class="text-lg font-semibold text-amber-400">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Report Unsafe Hazard
+            </h2>
+
+            <input id="hazDesc" type="text"
+                placeholder="Description (e.g. Unlit alleyway)"
+                class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm">
+
+            <button onclick="addHazard()"
+                class="w-full bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold py-2 rounded-lg">
+                Log Hazard Marker
+            </button>
+        </div>
+    </div>
+
+    <div class="lg:col-span-2 space-y-6">
+        <div class="glass-panel p-3 rounded-xl">
+            <div id="map"></div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+            <div class="glass-panel p-4 rounded-xl text-center">
+                <p class="text-xs text-slate-400">Safety Score</p>
+                <p id="metricScore" class="text-2xl font-bold text-emerald-400 mt-1">96/100</p>
+            </div>
+
+            <div class="glass-panel p-4 rounded-xl text-center">
+                <p class="text-xs text-slate-400">Street Lighting</p>
+                <p id="metricLight" class="text-2xl font-bold text-emerald-400 mt-1">96%</p>
+            </div>
+
+            <div class="glass-panel p-4 rounded-xl text-center">
+                <p class="text-xs text-slate-400">Estimated Time</p>
+                <p id="metricTime" class="text-2xl font-bold mt-1">12 mins</p>
+            </div>
+
+            <div class="glass-panel p-4 rounded-xl text-center">
+                <p class="text-xs text-slate-400">Help Havens</p>
+                <p id="metricHavens" class="text-2xl font-bold text-blue-400 mt-1">4 Points</p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div id="sosModal"
+    class="fixed inset-0 bg-slate-950/80 flex items-center justify-center hidden z-50">
+
+    <div class="glass-panel border-red-500/50 p-6 rounded-2xl max-w-md w-full mx-4 text-center space-y-4">
+
+        <div class="text-red-500 text-3xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+
+        <h3 class="text-xl font-bold text-white">Emergency SOS Demo</h3>
+
+        <p class="text-sm text-slate-300">
+            This is a demonstration only. No emergency alert has been sent.
+        </p>
+
+        <button onclick="closeSOS()"
+            class="w-full bg-slate-800 text-white font-bold py-2 rounded-lg">
+            Close
+        </button>
+    </div>
+</div>
+
+<script>
+const map = L.map('map').setView([51.5085, -0.1265], 15);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+}).addTo(map);
+
+const origin = [51.5074, -0.1278];
+const dest = [51.5110, -0.1235];
+
+const routes = {
+    safest: {
+        coords: [
+            [51.5074, -0.1278],
+            [51.5082, -0.1265],
+            [51.5095, -0.1250],
+            [51.5110, -0.1235]
+        ],
+        color: '#10b981',
+        score: '96/100',
+        light: '96%',
+        time: '12 mins',
+        havens: '4 Points'
+    },
+
+    balanced: {
+        coords: [
+            [51.5074, -0.1278],
+            [51.5090, -0.1270],
+            [51.5110, -0.1235]
+        ],
+        color: '#3b82f6',
+        score: '81/100',
+        light: '78%',
+        time: '9 mins',
+        havens: '2 Points'
+    },
+
+    fastest: {
+        coords: [
+            [51.5074, -0.1278],
+            [51.5110, -0.1235]
+        ],
+        color: '#f43f5e',
+        score: '52/100',
+        light: '38%',
+        time: '7 mins',
+        havens: '0 Points'
+    }
+};
+
+L.marker(origin).addTo(map).bindPopup('Origin: Charing Cross');
+L.marker(dest).addTo(map).bindPopup('Destination: Covent Garden');
+
+let polylines = {};
+
+for (let key in routes) {
+    polylines[key] = L.polyline(routes[key].coords, {
+        color: routes[key].color,
+        weight: key === 'safest' ? 6 : 3,
+        opacity: key === 'safest' ? 0.9 : 0.3
+    }).addTo(map);
+}
+
+L.circleMarker([51.5082, -0.1265], {
+    radius: 7,
+    color: '#3b82f6',
+    fillColor: '#3b82f6',
+    fillOpacity: 0.8
+}).addTo(map).bindPopup('Example Help Point');
+
+L.circleMarker([51.5095, -0.1250], {
+    radius: 7,
+    color: '#3b82f6',
+    fillColor: '#3b82f6',
+    fillOpacity: 0.8
+}).addTo(map).bindPopup('Example Well-Lit Point');
+
+function selectRoute(key) {
+    for (let r in polylines) {
+        polylines[r].setStyle({
+            weight: r === key ? 6 : 3,
+            opacity: r === key ? 0.9 : 0.3
+        });
+
+        const card = document.getElementById('card-' + r);
+
+        if (r === key) {
+            card.classList.add('border-2');
+            card.classList.remove('border');
+        } else {
+            card.classList.remove('border-2');
+            card.classList.add('border');
+        }
+    }
+
+    document.getElementById('metricScore').innerText = routes[key].score;
+    document.getElementById('metricLight').innerText = routes[key].light;
+    document.getElementById('metricTime').innerText = routes[key].time;
+    document.getElementById('metricHavens').innerText = routes[key].havens;
+}
+
+function addHazard() {
+    const input = document.getElementById('hazDesc');
+    const desc = input.value.trim() || 'Unlit Zone';
+
+    const marker = L.circleMarker([51.5080, -0.1275], {
+        radius: 8,
+        color: '#f59e0b',
+        fillColor: '#ef4444',
+        fillOpacity: 0.9
+    }).addTo(map);
+
+    marker.bindPopup(
+        '<b>Reported Hazard:</b> ' +
+        desc.replace(/[&<>"']/g, c => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[c])
+    ).openPopup();
+
+    input.value = '';
+}
+
+function triggerSOS() {
+    document.getElementById('sosModal').classList.remove('hidden');
+}
+
+function closeSOS() {
+    document.getElementById('sosModal').classList.add('hidden');
+}
+</script>
+
+</body>
+</html>
